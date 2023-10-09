@@ -72,13 +72,10 @@
     }
 
     function addCompatibilityForOtherExtensions(){
-		// hide upcoming song in beautiful lyrics full screen
-		const beautifulLyricsFullScreenButton = document.querySelector("#BeautifulLyricsFullscreenButton");
-		if(beautifulLyricsFullScreenButton){
-			document.addEventListener("fullscreenchange", () => {
-				recalculateUpcomingSongLayout();
-			});
-		}
+		// hide upcoming song in full screen
+		document.addEventListener("fullscreenchange", function() {
+			recalculateUpcomingSongLayout();
+		});
     }
 
 	function createUpcomingSongDiv() {
