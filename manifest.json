@@ -1,2 +1,12 @@
 [
+    {
+        "name": "Upcoming Song",
+        "description": "Displays the upcoming song near the current song based on the queue.",
+        "preview": "upcomingSong/preview.png",
+        "main": "upcomingSong/upcomingSong.js",
+        "readme": "upcomingSong/README.md",
+        "authors": [
+            { "name": "Fl3xm3ist3r", "url": "https://github.com/Fl3xm3ist3r" }
+        ]
+    }
 ]
