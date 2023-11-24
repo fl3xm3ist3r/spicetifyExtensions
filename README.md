@@ -13,13 +13,13 @@
 
 ## Extensions
 
-## [Upcoming Song](https://github.com/Fl3xm3ist3r/spicetify-extensions/blob/master/upcomingSong/README.md)
+## [Upcoming Song](https://github.com/fl3xm3ist3r/spicetify-extensions/blob/master/upcomingSong/README.md)
 
 _Displays the Upcoming Song near the Current Song based on the Queue._
 
 <details>
 <summary>Preview</summary>
-<picture><img src="https://raw.githubusercontent.com/Fl3xm3ist3r/spicetify-extensions/master/upcomingSong/preview.png" height="300" width="300" alt="Upcoming Song Preview"/></picture>
+<picture><img src="https://raw.githubusercontent.com/fl3xm3ist3r/spicetify-extensions/master/upcomingSong/preview.png" height="300" width="300" alt="Upcoming Song Preview"/></picture>
 </details>
 
 ## Coming soon
@@ -28,7 +28,7 @@ _More Extensions are currently in development._
 
 ## License
 
-The Extensions are all released under the [MIT License](https://github.com/Fl3xm3ist3r/spicetify-extensions/blob/master/LICENSE), which grants the following Permissions:
+The Extensions are all released under the [MIT License](https://github.com/fl3xm3ist3r/spicetify-extensions/blob/master/LICENSE), which grants the following Permissions:
 
 - Commercial use
 - Distribution
@@ -36,6 +36,6 @@ The Extensions are all released under the [MIT License](https://github.com/Fl3xm
 - Private use
 
 <hr>
-<p align="center"><a href="https://github.com/Fl3xm3ist3r/spicetify-extensions/blob/master/LICENSE"><img src="https://img.shields.io/static/v1.svg?label=License&message=MIT&colorA=363a4f&colorB=b2aaff&style=for-the-badge"/></a></p>
+<p align="center"><a href="https://github.com/fl3xm3ist3r/spicetify-extensions/blob/master/LICENSE"><img src="https://img.shields.io/static/v1.svg?label=License&message=MIT&colorA=363a4f&colorB=b2aaff&style=for-the-badge"/></a></p>
 
 <p align="center">ʕ⁠っ⁠•⁠ᴥ⁠•⁠ʔ⁠っ</p>

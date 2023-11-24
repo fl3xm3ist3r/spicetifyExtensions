@@ -17,18 +17,25 @@ _This Extension displays the Upcoming Song near the Current Song based on the Qu
 
 ## Preview
 
-<picture><img src="https://raw.githubusercontent.com/Fl3xm3ist3r/spicetify-extensions/master/upcomingSong/smallPreview.png" height="100" alt="Upcoming Song small Preview"/></picture>
+<picture><img src="https://raw.githubusercontent.com/fl3xm3ist3r/spicetify-extensions/master/upcomingSong/smallPreview.png" height="100" alt="Upcoming Song small Preview"/></picture>
 
-<picture><img src="https://raw.githubusercontent.com/Fl3xm3ist3r/spicetify-extensions/master/upcomingSong/preview.png" height="300" width="300" alt="Upcoming Song Preview"/></picture>
+<picture><img src="https://raw.githubusercontent.com/fl3xm3ist3r/spicetify-extensions/master/upcomingSong/preview.png" height="300" width="300" alt="Upcoming Song Preview"/></picture>
 
 ## Installation
 
-1. If you have [Spicetify Marketplace](https://github.com/spicetify/spicetify-marketplace) installed, you can install the Extension from Marketplace.
-2. Navigate to Marketplace in the app, go to Extensions and search for Upcoming Song.
+##### Via Spiectify Marketplace
+
+1. If you have [Spicetify Marketplace](https://github.com/spicetify/spicetify-marketplace) installed, you can install the Extension from the Marketplace.
+2. Navigate to Marketplace in the Spotify App, go to Extensions Tab and search for `Upcoming Song`.
+
+##### Manual Installation
+
+1. Download the [upcomingSong.js](https://github.com/fl3xm3ist3r/spicetify-extensions/blob/master/upcomingSong/upcomingSong.js) File
+2. Follow [The official Steps](https://spicetify.app/docs/advanced-usage/extensions/#installing) on how to manually Install a Spicetify Extension.
 
 ## License
 
-This Extension is released under the [MIT License](https://github.com/Fl3xm3ist3r/spicetify-extensions/blob/master/LICENSE), which grants the following Permissions:
+This Extension is released under the [MIT License](https://github.com/fl3xm3ist3r/spicetify-extensions/blob/master/LICENSE), which grants the following Permissions:
 
 - Commercial use
 - Distribution
@@ -36,6 +43,6 @@ This Extension is released under the [MIT License](https://github.com/Fl3xm3ist3
 - Private use
 
 <hr>
-<p align="center"><a href="https://github.com/Fl3xm3ist3r/spicetify-extensions/blob/master/LICENSE"><img src="https://img.shields.io/static/v1.svg?label=License&message=MIT&colorA=363a4f&colorB=b2aaff&style=for-the-badge"/></a></p>
+<p align="center"><a href="https://github.com/fl3xm3ist3r/spicetify-extensions/blob/master/LICENSE"><img src="https://img.shields.io/static/v1.svg?label=License&message=MIT&colorA=363a4f&colorB=b2aaff&style=for-the-badge"/></a></p>
 
 <p align="center">ʕ⁠っ⁠•⁠ᴥ⁠•⁠ʔ⁠っ</p>
