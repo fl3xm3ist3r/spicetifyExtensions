@@ -1,5 +1,5 @@
 // NAME: upcomingSong
-// AUTHOR: Fl3xm3ist3r (https://github.com/Fl3xm3ist3r)
+// AUTHOR: Fl3xm3ist3r (https://github.com/fl3xm3ist3r)
 // DESCRIPTION: Displays the upcoming song near the current song based on the queue.
 
 (function upcomingSong() {
