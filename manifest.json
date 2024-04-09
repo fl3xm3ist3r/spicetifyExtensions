@@ -7,6 +7,13 @@
     "readme": "upcomingSong/README.md",
     "authors": [
       { "name": "Fl3xm3ist3r", "url": "https://github.com/fl3xm3ist3r" }
+    ],
+    "tags": [
+      "upcoming song",
+      "upcoming",
+      "queue",
+      "next song",
+      "following song"
     ]
   }
 ]
