@@ -198,7 +198,7 @@
 		currentSong.style.display = "flex";
 	
 		const totalWidth = currentSong.parentElement.offsetWidth;
-		let currentSongPercentage = (currentSongWidth / totalWidth) * 100;
+		let currentSongPercentage = (currentSongWidth / totalWidth) * 100 + 1;
 		let upcomingSongPercentage = (upcomingSongWidth / totalWidth) * 100;
 	
         //style the elements acording to the 62% and 38% rule
