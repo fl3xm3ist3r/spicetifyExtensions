@@ -198,6 +198,8 @@
 		currentSong.style.display = "flex";
 	
 		const totalWidth = currentSong.parentElement.offsetWidth;
+
+		// +1 to avoid scrolling on song title with fancy fonts
 		let currentSongPercentage = (currentSongWidth / totalWidth) * 100 + 1;
 		let upcomingSongPercentage = (upcomingSongWidth / totalWidth) * 100;
 	
