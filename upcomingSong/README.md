@@ -13,7 +13,7 @@
 
 ## Upcoming Song
 
-_This Extension displays the Upcoming Song near the Current Song based on the Queue._
+_This Extension displays the upcoming song near the current song based on the queue. Clicking the upcoming song skips to it (plays the next track)._
 
 ## Preview
 
