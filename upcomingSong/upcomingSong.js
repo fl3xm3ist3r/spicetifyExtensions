@@ -57,23 +57,52 @@
             addCustomCss();
             addEventListeners();
 
-            const upcomingSongDiv = createUpcomingSongDiv();
-            nowPlayingLeft.appendChild(upcomingSongDiv);
-
-            const upcomingSongSkipDiv = document.getElementById("upcomingSongSkipDiv");
-
-            upcomingSongSkipDiv.addEventListener("click", (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                Spicetify.Player.next();
-            });
+            injectUpcomingSong(nowPlayingLeft);
 
             addCompatibilityForOtherExtensions();
+            observeUpcomingSong();
 
             setTimeout(updateUpcomingSong, LOAD_DELAY_IN_MS);
         } catch (error) {
             console.error("[upcomingSong] Failed to inject extension:", error);
         }
+    }
+
+    function injectUpcomingSong(nowPlayingLeft) {
+        if (!nowPlayingLeft || document.getElementById("upcomingSongDiv")) {
+            return;
+        }
+
+        const upcomingSongDiv = createUpcomingSongDiv();
+        nowPlayingLeft.appendChild(upcomingSongDiv);
+
+        const upcomingSongSkipDiv = document.getElementById("upcomingSongSkipDiv");
+
+        upcomingSongSkipDiv.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            Spicetify.Player.next();
+        });
+    }
+
+    function observeUpcomingSong() {
+        const observer = new MutationObserver(() => {
+            const nowPlayingLeft = document.querySelector(".main-nowPlayingBar-left");
+            const upcomingSongDiv = document.getElementById("upcomingSongDiv");
+
+            if (nowPlayingLeft && !upcomingSongDiv) {
+                console.log("[upcomingSong] Upcoming song element was removed. Re-injecting...");
+
+                injectUpcomingSong(nowPlayingLeft);
+
+                setTimeout(updateUpcomingSong, LOAD_DELAY_IN_MS);
+            }
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+        });
     }
 
     function addCustomCss() {
