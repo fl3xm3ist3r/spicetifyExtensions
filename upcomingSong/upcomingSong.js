@@ -3,337 +3,356 @@
 // DESCRIPTION: Displays the upcoming song near the current song based on the queue.
 
 (function upcomingSong() {
-    const SPICETIFY_LOAD_INTERVAL_IN_MS = 4000;
-    const LOAD_DELAY_IN_MS = 10;
-    const ELEMENT_WAIT_TIMEOUT_IN_MS = 30000;
+  const INSTANCE_KEY = Symbol.for("spicetify.upcomingSong");
+  const STYLE_ID = "upcomingSongStyles";
+  const COMPONENT_ID = "upcomingSongDiv";
+  const PLAYER_BAR_SELECTOR = ".main-nowPlayingBar-left";
+  const SPICETIFY_RETRY_INTERVAL_MS = 1000;
+  const QUEUE_SETTLE_DELAY_MS = 100;
 
-    function waitForSpicetifyLoad() {
-        if (!Spicetify.Player.data || !Spicetify.LocalStorage) {
-            setTimeout(waitForSpicetifyLoad, SPICETIFY_LOAD_INTERVAL_IN_MS);
-            return;
-        }
+  if (window[INSTANCE_KEY]) {
+    return;
+  }
 
-        addUpcomingSong();
+  window[INSTANCE_KEY] = true;
+
+  let playerBar;
+  let component;
+  let lastTrackKey = null;
+  let imageRequestId = 0;
+  let renderTimeout;
+
+  function waitForSpicetify() {
+    const spicetify = window.Spicetify;
+
+    if (!spicetify?.Player?.addEventListener || !spicetify.Player.next) {
+      setTimeout(waitForSpicetify, SPICETIFY_RETRY_INTERVAL_MS);
+      return;
     }
 
-    function waitForElement(selector, timeout = ELEMENT_WAIT_TIMEOUT_IN_MS) {
-        const existingElement = document.querySelector(selector);
+    initialize(spicetify);
+  }
 
-        if (existingElement) {
-            return Promise.resolve(existingElement);
-        }
+  function initialize(spicetify) {
+    addStyles();
+    component = createComponent();
 
-        return new Promise((resolve, reject) => {
-            const observer = new MutationObserver(() => {
-                const element = document.querySelector(selector);
+    spicetify.Player.addEventListener("songchange", scheduleUpcomingSongRender);
+    subscribeToQueueChanges();
+    document.addEventListener("fullscreenchange", renderUpcomingSong);
 
-                if (element) {
-                    observer.disconnect();
-                    clearTimeout(timeoutId);
-                    resolve(element);
-                }
-            });
+    const observer = new MutationObserver(() => {
+      if (!component.button.isConnected || component.button.parentElement !== playerBar) {
+        ensureMounted();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
 
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true,
-            });
+    ensureMounted();
+    scheduleUpcomingSongRender();
+  }
 
-            const timeoutId = setTimeout(() => {
-                observer.disconnect();
-                reject(new Error(`Timed out waiting for element: ${selector}`));
-            }, timeout);
-        });
+  function subscribeToQueueChanges() {
+    // Spicetify has no stable public queue-change event, so keep this private API usage isolated.
+    const queueEvents = window.Spicetify.Platform?.PlayerAPI?._queue?._events;
+
+    if (typeof queueEvents?.addListener !== "function") {
+      setTimeout(subscribeToQueueChanges, SPICETIFY_RETRY_INTERVAL_MS);
+      return;
     }
 
-    async function addUpcomingSong() {
-        try {
-            const nowPlayingLeft = await waitForElement(".main-nowPlayingBar-left");
+    queueEvents.addListener("queue_update", scheduleUpcomingSongRender);
+  }
 
-            if (document.getElementById("upcomingSongDiv")) {
-                return;
-            }
+  function scheduleUpcomingSongRender() {
+    clearTimeout(renderTimeout);
+    renderTimeout = setTimeout(renderUpcomingSong, QUEUE_SETTLE_DELAY_MS);
+  }
 
-            addCustomCss();
-            addEventListeners();
-
-            injectUpcomingSong(nowPlayingLeft);
-
-            addCompatibilityForOtherExtensions();
-            observeUpcomingSong();
-
-            setTimeout(updateUpcomingSong, LOAD_DELAY_IN_MS);
-        } catch (error) {
-            console.error("[upcomingSong] Failed to inject extension:", error);
-        }
+  function addStyles() {
+    if (document.getElementById(STYLE_ID)) {
+      return;
     }
 
-    function injectUpcomingSong(nowPlayingLeft) {
-        if (!nowPlayingLeft || document.getElementById("upcomingSongDiv")) {
-            return;
-        }
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = `
+      .main-nowPlayingBar-left.upcoming-song-visible {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+      }
 
-        const upcomingSongDiv = createUpcomingSongDiv();
-        nowPlayingLeft.appendChild(upcomingSongDiv);
+      .main-nowPlayingBar-left.upcoming-song-visible > .main-nowPlayingWidget-nowPlaying {
+        flex: 0 1 auto;
+        max-width: 65%;
+        min-width: 0;
+      }
 
-        const upcomingSongSkipDiv = document.getElementById("upcomingSongSkipDiv");
+      .upcoming-song {
+        display: flex;
+        flex: 1 1 0;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        margin-top: 25px;
+        padding: 0 0 0 16px;
+        overflow: hidden;
+        border: 0;
+        color: inherit;
+        background: transparent;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
 
-        upcomingSongSkipDiv.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            Spicetify.Player.next();
-        });
+      .upcoming-song[hidden] {
+        display: none !important;
+      }
+
+      .upcoming-song:focus-visible {
+        outline: 2px solid currentColor;
+        outline-offset: 2px;
+      }
+
+      .upcoming-song__cover {
+        position: relative;
+        display: grid;
+        flex: 0 0 40px;
+        width: 40px;
+        height: 40px;
+        place-items: center;
+        overflow: hidden;
+        background: var(--background-elevated-base, rgba(255, 255, 255, 0.08));
+      }
+
+      .upcoming-song__cover img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .upcoming-song__cover img[hidden],
+      .upcoming-song__fallback[hidden] {
+        display: none;
+      }
+
+      .upcoming-song__fallback {
+        display: grid;
+        place-items: center;
+        color: var(--text-subdued, currentColor);
+      }
+
+      .upcoming-song__fallback svg {
+        width: 22px;
+        height: 22px;
+        fill: currentColor;
+      }
+
+      .upcoming-song__info {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+
+      .upcoming-song__title,
+      .upcoming-song__artist {
+        display: block;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .upcoming-song__title {
+        font-size: 0.75rem;
+        font-weight: 700;
+      }
+
+      .upcoming-song__artist {
+        margin-top: 2px;
+        color: var(--text-subdued, currentColor);
+        font-size: 0.6875rem;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  function createComponent() {
+    const button = document.createElement("button");
+    button.id = COMPONENT_ID;
+    button.className = "upcoming-song";
+    button.type = "button";
+    button.hidden = true;
+
+    const cover = document.createElement("span");
+    cover.className = "upcoming-song__cover";
+    cover.setAttribute("aria-hidden", "true");
+
+    const image = document.createElement("img");
+    image.alt = "";
+    image.hidden = true;
+
+    const fallback = document.createElement("span");
+    fallback.className = "upcoming-song__fallback";
+    fallback.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13h-2V5.4l-8 1.3V18a4 4 0 1 1-2-3.46V18a2 2 0 1 0 2 2V8.73l8-1.34V16a4 4 0 1 1-2-3.46V6.4l-8 1.33V18H9z"></path></svg>`;
+
+    cover.append(image, fallback);
+
+    const info = document.createElement("span");
+    info.className = "upcoming-song__info";
+
+    const title = document.createElement("span");
+    title.className = "upcoming-song__title";
+
+    const artist = document.createElement("span");
+    artist.className = "upcoming-song__artist";
+
+    info.append(title, artist);
+    button.append(cover, info);
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      window.Spicetify.Player.next();
+    });
+
+    return { button, title, artist, image, fallback };
+  }
+
+  function ensureMounted() {
+    const currentPlayerBar = document.querySelector(PLAYER_BAR_SELECTOR);
+
+    if (playerBar && playerBar !== currentPlayerBar) {
+      playerBar.classList.remove("upcoming-song-visible");
     }
 
-    function observeUpcomingSong() {
-        const observer = new MutationObserver(() => {
-            const nowPlayingLeft = document.querySelector(".main-nowPlayingBar-left");
-            const upcomingSongDiv = document.getElementById("upcomingSongDiv");
+    playerBar = currentPlayerBar;
 
-            if (nowPlayingLeft && !upcomingSongDiv) {
-                console.log("[upcomingSong] Upcoming song element was removed. Re-injecting...");
-
-                injectUpcomingSong(nowPlayingLeft);
-
-                setTimeout(updateUpcomingSong, LOAD_DELAY_IN_MS);
-            }
-        });
-
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true,
-        });
+    if (!playerBar) {
+      return;
     }
 
-    function addCustomCss() {
-        const styleElement = document.createElement("style");
-        styleElement.textContent = `
-            .main-nowPlayingBar-left {
-                display: flex;
-            }
-            
-            .main-nowPlayingWidget-nowPlaying {
-                box-sizing: border-box;
-            }
-            
-            #upcomingSongDiv {
-                box-sizing: border-box;
-                padding-left: 20px;
-                padding-top: 24px;
-            }
-
-            #upcomingSongSkipDiv {
-                cursor: pointer;
-                user-select: none;
-            }
-        `;
-        document.head.appendChild(styleElement);
+    if (component.button.parentElement !== playerBar) {
+      playerBar.appendChild(component.button);
     }
 
-    function addEventListeners() {
-        const shuffleButton = document.querySelector(".main-shuffleButton-button");
+    playerBar.classList.toggle("upcoming-song-visible", !component.button.hidden);
+  }
 
-        if (shuffleButton) {
-            shuffleButton.addEventListener("click", function () {
-                setTimeout(updateUpcomingSong, LOAD_DELAY_IN_MS);
-            });
-        }
+  function getNextTrack() {
+    const queue = window.Spicetify?.Queue;
+    const nextTracks = queue?.nextTracks;
 
-        Spicetify.Player.addEventListener("songchange", () => {
-            setTimeout(updateUpcomingSong, LOAD_DELAY_IN_MS);
-        });
-
-        Spicetify.Platform.PlayerAPI._queue._events.addListener("queue_update", (eventData) => {
-            if (Spicetify.Queue.nextTracks != null && Spicetify.Queue.nextTracks[0]) {
-                if (Spicetify.Queue.nextTracks[0].contextTrack.uid != Spicetify.Queue.track.contextTrack.uid) {
-                    setTimeout(updateUpcomingSong, LOAD_DELAY_IN_MS);
-                }
-            }
-        });
+    if (!Array.isArray(nextTracks)) {
+      return null;
     }
 
-    function addCompatibilityForOtherExtensions() {
-        // hide upcoming song in full screen
-        document.addEventListener("fullscreenchange", function () {
-            recalculateUpcomingSongLayout();
-        });
+    const currentTrackUid = queue.track?.contextTrack?.uid;
+
+    return (
+      nextTracks.find((entry) => {
+        const contextTrack = entry?.contextTrack;
+        const metadata = contextTrack?.metadata;
+        const isRemoved = entry?.removed?.length > 0 || entry?.removed === true;
+
+        return !isRemoved && Boolean(contextTrack?.uid && metadata?.title) && contextTrack.uid !== currentTrackUid;
+      }) ?? null
+    );
+  }
+
+  function getArtists(metadata) {
+    const artists = [];
+
+    if (metadata.artist_name) {
+      artists.push(metadata.artist_name);
     }
 
-    function createUpcomingSongDiv() {
-        const upcomingSongDiv = document.createElement("div");
-        upcomingSongDiv.setAttribute("id", "upcomingSongDiv");
-        upcomingSongDiv.innerHTML = `
-            <div id="upcomingSongSkipDiv" class="main-nowPlayingWidget-nowPlaying">
-                <div class="main-coverSlotCollapsed-container main-coverSlotCollapsed-navAltContainer" aria-hidden="false">
-                    <div draggable="true">
-                        <div class="GlueDropTarget GlueDropTarget--albums GlueDropTarget--tracks GlueDropTarget--episodes GlueDropTarget--local-tracks">
-                            <a id="upcomingSongPlaylist" draggable="false" data-context-item-type="track" style="border: none;">
-                                <div class="main-nowPlayingWidget-coverArt">
-                                    <div class="cover-art" aria-hidden="true" style="width: 30px; height: 30px; margin-top: 35%;">
-                                        <div class="cover-art-icon" style="position: initial;">
-                                            <svg role="img" height="24" width="24" aria-hidden="true" viewBox="-3 -3 30 30" data-encore-id="icon" class="Svg-sc-ytk21e-0 Svg-img-icon">
-                                                <path d="M6 3h15v15.167a3.5 3.5 0 1 1-3.5-3.5H19V5H8v13.167a3.5 3.5 0 1 1-3.5-3.5H6V3zm0 13.667H4.5a1.5 1.5 0 1 0 1.5 1.5v-1.5zm13 0h-1.5a1.5 1.5 0 1 0 1.5 1.5v-1.5z"></path>
-                                            </svg>
-                                        </div>
-                                        <img id="upcomingSongImg" aria-hidden="false" draggable="false" loading="eager" src="" alt="" class="main-image-image cover-art-image main-image-loaded" style="" />
-                                    </div>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                <div class="main-nowPlayingWidget-trackInfo main-trackInfo-container" style="margin: 0;">
-                    <div class="main-trackInfo-name">
-                        <div class="main-trackInfo-overlay">
-                            <div class="main-trackInfo-contentContainer">
-                                <div class="main-trackInfo-contentWrapper" style="--trans-x: 0px;">
-                                    <div class="Type__TypeElement-sc-goli3j-0 TypeElement-mesto-type main-trackInfo-name" dir="auto" data-encore-id="type" style="margin-top: 5px">
-                                        <a id="upcomingSongTitle" draggable="false" style="font-size: 0.7em; text-decoration: none;"></a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="main-trackInfo-artists" style="padding-top: 0;">
-                        <div class="main-trackInfo-overlay">
-                            <div class="main-trackInfo-contentContainer">
-                                <div class="main-trackInfo-contentWrapper" style="--trans-x: 0px;">
-                                    <div class="Type__TypeElement-sc-goli3j-0 TypeElement-finale-textSubdued-type main-trackInfo-artists" data-encore-id="type" style="font-size: 0.5em; padding-top: 0;">
-                                        <span>
-                                            <a id="upcomingSongArtist" draggable="true" dir="auto" style="text-decoration: none;"></a>
-                                        </span>
-                                        <span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        return upcomingSongDiv;
+    for (let index = 1; metadata[`artist_name:${index}`]; index += 1) {
+      artists.push(metadata[`artist_name:${index}`]);
     }
 
-    function updateUpcomingSong() {
-        const queue = Spicetify.Queue;
-        var nextTrack = null;
-
-        for (let i = 0; i < queue.nextTracks.length; i++) {
-            var tmpNextTrack = queue.nextTracks[i];
-
-            if (
-                !tmpNextTrack.removed.length &&
-                tmpNextTrack.contextTrack.uid != Spicetify.Queue.track.contextTrack.uid
-            ) {
-                nextTrack = tmpNextTrack;
-                break;
-            }
-        }
-
-        const upcomingSongTitle = document.getElementById("upcomingSongTitle");
-        const upcomingSongArtist = document.getElementById("upcomingSongArtist");
-        const upcomingSongImg = document.getElementById("upcomingSongImg");
-
-        if (nextTrack) {
-            upcomingSongTitle.innerText = nextTrack.contextTrack.metadata.title;
-
-            upcomingSongArtist.innerText = nextTrack.contextTrack.metadata.artist_name;
-
-            for (let i = 1; i > 0; i++) {
-                if (nextTrack.contextTrack.metadata["artist_name:" + i]) {
-                    upcomingSongArtist.innerText += ", " + nextTrack.contextTrack.metadata["artist_name:" + i];
-                } else {
-                    break;
-                }
-            }
-
-            if (!nextTrack.contextTrack.metadata.image_url) {
-                upcomingSongImg.style.display = "none";
-            } else {
-                upcomingSongImg.style.display = "flex";
-                upcomingSongImg.src = nextTrack.contextTrack.metadata.image_url;
-            }
-        } else {
-            upcomingSongTitle.innerText = "NoSongWasFound";
-        }
-
-        recalculateUpcomingSongLayout();
+    if (artists.length === 0 && Array.isArray(metadata.artists)) {
+      artists.push(...metadata.artists.map((artist) => artist.name).filter(Boolean));
     }
 
-    function recalculateUpcomingSongLayout() {
-        const currentSong = document.querySelector(".main-nowPlayingWidget-nowPlaying:not(#upcomingSongDiv)");
-        const upcomingSong = document.querySelector("#upcomingSongDiv");
+    return artists.join(", ");
+  }
 
-        // no upcoming song was found
-        const upcomingSongTitle = document.getElementById("upcomingSongTitle");
-
-        if (upcomingSongTitle.innerText == "NoSongWasFound") {
-            currentSong.style.flex = `0 0 ${100}%`;
-            upcomingSong.style.setProperty("display", "none", "important");
-            return;
-        }
-
-        // get actual width of elements
-        currentSong.style.flex = ``;
-        upcomingSong.style.display = "none";
-        const currentSongWidth = currentSong.offsetWidth;
-        upcomingSong.style.display = "flex";
-
-        upcomingSong.style.flex = ``;
-        currentSong.style.display = "none";
-        const upcomingSongWidth = upcomingSong.offsetWidth;
-        currentSong.style.display = "flex";
-
-        const totalWidth = currentSong.parentElement.offsetWidth;
-
-        // +1 to avoid scrolling on song title with fancy fonts
-        let currentSongPercentage = (currentSongWidth / totalWidth) * 100 + 1;
-        let upcomingSongPercentage = (upcomingSongWidth / totalWidth) * 100;
-
-        // style the elements according to the 62% and 38% rule
-        if (currentSongPercentage > 62 && upcomingSongPercentage > 38) {
-            currentSongPercentage = 62;
-            upcomingSongPercentage = 38;
-        } else if (
-            upcomingSongPercentage <= 38 &&
-            currentSongPercentage > 62 &&
-            currentSongPercentage + upcomingSongPercentage > 100
-        ) {
-            currentSongPercentage = 100 - upcomingSongPercentage;
-        } else if (
-            currentSongPercentage <= 62 &&
-            upcomingSongPercentage > 38 &&
-            currentSongPercentage + upcomingSongPercentage > 100
-        ) {
-            upcomingSongPercentage = 100 - currentSongPercentage;
-        }
-
-        currentSong.style.flex = `0 0 ${currentSongPercentage}%`;
-
-        upcomingSong.style.flex = `0 0 ${upcomingSongPercentage}%`;
-
-        // ensure upcomingSong appears behind currentSong
-        // seems to be caused by enhanced playlists
-        if (currentSong.parentElement.children[1].getAttribute("id") != "upcomingSongDiv") {
-            upcomingSong.remove();
-            currentSong.parentElement.appendChild(upcomingSong);
-        }
-
-        checkIfFullScreen();
+  function resolveImageUrl(imageValue) {
+    if (typeof imageValue !== "string" || !imageValue.trim()) {
+      return null;
     }
 
-    function checkIfFullScreen() {
-        const upcomingSongDiv = document.querySelector("#upcomingSongDiv");
+    const image = imageValue.trim();
 
-        if (upcomingSongDiv) {
-            if (document.fullscreenElement) {
-                upcomingSongDiv.style.setProperty("display", "none", "important");
-            } else {
-                upcomingSongDiv.style = "flex";
-            }
-        }
+    if (image.startsWith("spotify:image:")) {
+      const imageId = image.slice("spotify:image:".length);
+      return imageId ? `https://i.scdn.co/image/${encodeURIComponent(imageId)}` : null;
     }
 
-    waitForSpicetifyLoad();
+    try {
+      const url = new URL(image);
+      return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function renderUpcomingSong() {
+    renderUpcomingTrack(getNextTrack());
+  }
+
+  function renderUpcomingTrack(track) {
+    const visible = Boolean(track) && !document.fullscreenElement;
+
+    component.button.hidden = !visible;
+    playerBar?.classList.toggle("upcoming-song-visible", visible);
+
+    if (!track) {
+      lastTrackKey = null;
+      imageRequestId += 1;
+      return;
+    }
+
+    const contextTrack = track.contextTrack;
+    const metadata = contextTrack.metadata;
+    const titleText = metadata.title;
+    const artistText = getArtists(metadata);
+    const imageUrl = resolveImageUrl(metadata.image_url ?? metadata.image_uri);
+    const trackKey = JSON.stringify([contextTrack.uid ?? contextTrack.uri, titleText, artistText, imageUrl]);
+
+    if (trackKey === lastTrackKey) {
+      return;
+    }
+
+    lastTrackKey = trackKey;
+    component.title.textContent = titleText;
+    component.artist.textContent = artistText;
+    component.button.setAttribute("aria-label", `Play next: ${titleText}${artistText ? ` by ${artistText}` : ""}`);
+
+    const image = document.createElement("img");
+    image.alt = "";
+    image.hidden = true;
+    component.image.replaceWith(image);
+    component.image = image;
+    const requestId = ++imageRequestId;
+
+    component.fallback.hidden = false;
+
+    if (!imageUrl) {
+      return;
+    }
+
+    image.onload = () => {
+      if (requestId === imageRequestId && image.naturalWidth > 0) {
+        image.hidden = false;
+        component.fallback.hidden = true;
+      }
+    };
+
+    image.src = imageUrl;
+  }
+
+  waitForSpicetify();
 })();
