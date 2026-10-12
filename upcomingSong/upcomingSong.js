@@ -6,9 +6,11 @@
   const INSTANCE_KEY = Symbol.for("spicetify.upcomingSong");
   const STYLE_ID = "upcomingSongStyles";
   const COMPONENT_ID = "upcomingSongDiv";
-  const PLAYER_BAR_SELECTOR = ".main-nowPlayingBar-left";
+  const PLAYER_WIDGET_SELECTOR = '[data-testid="now-playing-widget"]';
   const SPICETIFY_RETRY_INTERVAL_MS = 1000;
   const QUEUE_SETTLE_DELAY_MS = 100;
+  const INITIAL_QUEUE_RETRY_INTERVAL_MS = 1000;
+  const MAX_INITIAL_QUEUE_RETRIES = 30;
 
   if (window[INSTANCE_KEY]) {
     return;
@@ -21,6 +23,7 @@
   let lastTrackKey = null;
   let imageRequestId = 0;
   let renderTimeout;
+  let initialQueueRetryCount = 0;
 
   function waitForSpicetify() {
     const spicetify = window.Spicetify;
@@ -50,6 +53,7 @@
 
     ensureMounted();
     scheduleUpcomingSongRender();
+    retryInitialQueue();
   }
 
   function subscribeToQueueChanges() {
@@ -69,6 +73,20 @@
     renderTimeout = setTimeout(renderUpcomingSong, QUEUE_SETTLE_DELAY_MS);
   }
 
+  function retryInitialQueue() {
+    if (getNextTrack()) {
+      scheduleUpcomingSongRender();
+      return;
+    }
+
+    if (initialQueueRetryCount >= MAX_INITIAL_QUEUE_RETRIES) {
+      return;
+    }
+
+    initialQueueRetryCount += 1;
+    setTimeout(retryInitialQueue, INITIAL_QUEUE_RETRY_INTERVAL_MS);
+  }
+
   function addStyles() {
     if (document.getElementById(STYLE_ID)) {
       return;
@@ -77,13 +95,13 @@
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
-      .main-nowPlayingBar-left.upcoming-song-visible {
+      .upcoming-song-host.upcoming-song-visible {
         display: flex;
         align-items: center;
         min-width: 0;
       }
 
-      .main-nowPlayingBar-left.upcoming-song-visible > .main-nowPlayingWidget-nowPlaying {
+      .upcoming-song-host.upcoming-song-visible > [data-testid="now-playing-widget"] {
         flex: 0 1 auto;
         max-width: 65%;
         min-width: 0;
@@ -221,10 +239,12 @@
   }
 
   function ensureMounted() {
-    const currentPlayerBar = document.querySelector(PLAYER_BAR_SELECTOR);
+    const currentPlayerWidget = document.querySelector(PLAYER_WIDGET_SELECTOR);
+    const currentPlayerBar = currentPlayerWidget?.parentElement ?? null;
 
     if (playerBar && playerBar !== currentPlayerBar) {
       playerBar.classList.remove("upcoming-song-visible");
+      playerBar.classList.remove("upcoming-song-host");
     }
 
     playerBar = currentPlayerBar;
@@ -232,6 +252,8 @@
     if (!playerBar) {
       return;
     }
+
+    playerBar.classList.add("upcoming-song-host");
 
     if (component.button.parentElement !== playerBar) {
       playerBar.appendChild(component.button);
